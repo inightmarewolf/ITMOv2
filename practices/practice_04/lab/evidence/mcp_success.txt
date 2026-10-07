@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "result": {
+    "subscribed": true,
+    "name": "Ann"
+  },
+  "subscribers": [
+    "Ann"
+  ]
+}
