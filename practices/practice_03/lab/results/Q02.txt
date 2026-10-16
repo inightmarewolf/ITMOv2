@@ -1,0 +1,13 @@
+QUESTION:
+Что будет при пустом имени подписчика? Подтверди кодом.
+
+ANSWER:
+При пустом имени подписчика функция `subscribe` поднимет исключение `ValueError` с сообщением "empty name".
+
+Подтверждение в файле **service.py**, строка **6**:
+```python
+if not name.strip():
+    raise ValueError("empty name")
+```
+
+wall_seconds: 17.61
