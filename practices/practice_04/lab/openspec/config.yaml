@@ -1,0 +1,23 @@
+schema: spec-driven
+
+context: |
+  Notify Mini — учебный in-memory сервис подписки.
+  Stdlib only. Проверка: make test / python scripts/check.py.
+  Не добавляй persistence, HTTP и внешние зависимости без явной просьбы.
+
+rules:
+  design:
+    - Объясни взаимодействие диаграммой Mermaid.
+    - Явно перечисли Non-Goals, чтобы агент не расползался.
+  proposal:
+    - Держи proposal коротко: why / what / capabilities / impact.
+  tasks:
+    - Каждый пункт tasks должен быть проверяемым (тест или команда).
+
+operations:
+  apply:
+    guidance:
+      - Не выходи за границы change; при новом решении сначала обнови specs.
+  archive:
+    guidance:
+      - Перед archive сверь main specs с фактическим поведением и выводом make test.
