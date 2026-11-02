@@ -1,0 +1,8 @@
+Standard library only: ready
+Ran 30 tests in ~0.7s
+OK (skipped=1)
+
+skipped: test_symlink_cannot_escape_exercise — WinError 1314 (нет права на symlink на этой Windows).
+
+Команда: make step6  (из practices/practice_06)
+Дата прогона: 2026-10-29
