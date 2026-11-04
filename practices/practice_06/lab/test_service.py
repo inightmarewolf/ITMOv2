@@ -98,7 +98,11 @@ class SandboxTest(unittest.TestCase):
             sentinel = Path(directory) / "sentinel.txt"
             sentinel.write_text("keep")
             link = self.sandbox.root / "escape"
-            link.symlink_to(directory, target_is_directory=True)
+            try:
+                link.symlink_to(directory, target_is_directory=True)
+            except OSError as exc:
+                # WinError 1314 — нет права на symlink без Developer Mode / admin
+                self.skipTest(f"symlinks unavailable in this environment: {exc}")
             with self.assertRaises(ValueError):
                 self.sandbox.read("escape/sentinel.txt")
             with self.assertRaises(ValueError):
