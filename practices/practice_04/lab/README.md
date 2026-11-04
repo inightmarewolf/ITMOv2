@@ -2,7 +2,13 @@
 
 ## Фичи
 
-См. `FEATURES.md`: **A** валидация имени, **B** список подписчиков.
+См. `FEATURES.md`: **A** валидация имени, **B** список подписчиков, **C** отписка + CLI (практика 5).
+
+```bash
+python cli.py subscribe Ann
+python cli.py list
+python cli.py unsubscribe Ann
+```
 
 ## Среда
 

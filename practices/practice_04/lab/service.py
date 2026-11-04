@@ -8,7 +8,15 @@ def subscribe(name):
     return {"subscribed": True, "name": name.strip()}
 
 
+def unsubscribe(name):
+    cleaned = name.strip()
+    if not cleaned:
+        raise ValueError("empty name")
+    if cleaned not in subscribers:
+        raise ValueError("unknown name")
+    subscribers.remove(cleaned)
+    return {"unsubscribed": True, "name": cleaned}
+
+
 def list_subscribers():
     return sorted(subscribers)
-
-# hook-demo

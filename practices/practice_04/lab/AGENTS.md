@@ -6,6 +6,7 @@
 
 - **A:** валидация пустого имени в `subscribe`
 - **B:** `list_subscribers()` — отсортированный список
+- **C:** `unsubscribe(name)` + CLI (`cli.py`)
 
 ## Куда смотреть
 
@@ -13,8 +14,9 @@
 |---|---|
 | Контракт | `docs/requirements.md` |
 | Style guide | `docs/style-guide.md` |
-| Код | `service.py` |
-| Тесты | `test_service.py` |
+| Код | `service.py`, `cli.py` |
+| Тесты | `test_service.py`, `test_cli.py` |
+| OpenSpec | `openspec/` |
 | Skill | `.opencode/skills/notify-tests/SKILL.md` |
 | MCP tool | `subscribe_name` (сервер `notify`) |
 | Hook | `.opencode/plugins/check-after-edit.js` |
