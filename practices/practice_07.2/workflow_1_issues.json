@@ -1,0 +1,826 @@
+{
+  "name": "Practice 7.2 - Workflow 1: Issue Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "owner": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "events": [
+          "issues"
+        ],
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222201",
+      "name": "GitHub Issues Trigger",
+      "type": "n8n-nodes-base.githubTrigger",
+      "position": [
+        -760,
+        280
+      ],
+      "webhookId": "9a8b7c6d-5e4f-4321-abcd-1234567890ab",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-issue-opened",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "opened",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222202",
+      "name": "Filter Issue Opened",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -540,
+        280
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "issue_id",
+              "keyValue": "={{ String($json.body.issue.number) }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "22222222-2222-4222-8222-222222222203",
+      "name": "Check Issue in Data Table",
+      "type": "n8n-nodes-base.dataTable",
+      "position": [
+        -320,
+        280
+      ],
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-not-processed",
+              "leftValue": "={{ $json.issue_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222204",
+      "name": "If Not Processed Yet",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -100,
+        280
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-first-time",
+              "leftValue": "={{ $('Filter Issue Opened').first().json.body.issue.author_association }}",
+              "rightValue": "NONE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222205",
+      "name": "If First-Time Contributor",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        140,
+        20
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/issues/{{ $('Filter Issue Opened').first().json.body.issue.number }}/labels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"labels\": [\"first-time-contributor\"] }",
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222206",
+      "name": "Add Label First-Time",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        380,
+        -60
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/issues/{{ $('Filter Issue Opened').first().json.body.issue.number }}/comments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: 'Привет @' + $('Filter Issue Opened').first().json.body.issue.user.login + '! Рады вашему первому Issue. Ознакомьтесь с [CONTRIBUTING.md](CONTRIBUTING.md).' }) }}",
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222207",
+      "name": "Comment Welcome",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        620,
+        -60
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const issue = $('Filter Issue Opened').first().json.body.issue;\nreturn [{\n  json: {\n    title: issue.title || '',\n    body: issue.body || ''\n  }\n}];"
+      },
+      "id": "22222222-2222-4222-8222-222222222208",
+      "name": "Prepare Classifier Input",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        140,
+        280
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222209",
+      "name": "Call Classifier Sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        360,
+        280
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-confidence",
+              "leftValue": "={{ $json.confidence }}",
+              "rightValue": 0.8,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "cond-known-type",
+              "leftValue": "={{ ['bug', 'task', 'feature'].includes($json.type) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222210",
+      "name": "If Confident",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        580,
+        280
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "bug",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "bug"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "task",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "task"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "feature",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "feature"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222211",
+      "name": "Switch by Type",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        820,
+        200
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/issues/{{ $('Filter Issue Opened').first().json.body.issue.number }}/labels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"labels\": [\"bug\"] }",
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222212",
+      "name": "Add Label bug",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1080,
+        40
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/issues/{{ $('Filter Issue Opened').first().json.body.issue.number }}/comments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: 'Спасибо за баг-репорт! Мы классифицировали это обращение как **bug** (confidence: ' + $('Call Classifier Sub-workflow').first().json.confidence + '). Команда скоро изучит шаги воспроизведения.' }) }}",
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222213",
+      "name": "Comment Bug",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1300,
+        40
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/issues/{{ $('Filter Issue Opened').first().json.body.issue.number }}/labels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"labels\": [\"task\"] }",
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222214",
+      "name": "Add Label task",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1080,
+        200
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/issues/{{ $('Filter Issue Opened').first().json.body.issue.number }}/comments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: 'Спасибо за вопрос/задачу! Обращение классифицировано как **task** (confidence: ' + $('Call Classifier Sub-workflow').first().json.confidence + ').' }) }}",
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222215",
+      "name": "Comment Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1300,
+        200
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/issues/{{ $('Filter Issue Opened').first().json.body.issue.number }}/labels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"labels\": [\"feature\"] }",
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222216",
+      "name": "Add Label feature",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1080,
+        360
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/issues/{{ $('Filter Issue Opened').first().json.body.issue.number }}/comments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: 'Спасибо за предложение новой функциональности! Мы классифицировали это как **feature** (confidence: ' + $('Call Classifier Sub-workflow').first().json.confidence + ').' }) }}",
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222217",
+      "name": "Comment Feature",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1300,
+        360
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/issues/{{ $('Filter Issue Opened').first().json.body.issue.number }}/labels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"labels\": [\"needs-triage\"] }",
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222218",
+      "name": "Add Label needs-triage",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1080,
+        540
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "issue_id": "={{ String($('Filter Issue Opened').first().json.body.issue.number) }}",
+            "author": "={{ $('Filter Issue Opened').first().json.body.issue.user.login }}",
+            "created_at": "={{ $now.toISO() }}"
+          }
+        }
+      },
+      "id": "22222222-2222-4222-8222-222222222219",
+      "name": "Save Issue to Data Table",
+      "type": "n8n-nodes-base.dataTable",
+      "position": [
+        1560,
+        280
+      ],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "GitHub Issues Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter Issue Opened",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Issue Opened": {
+      "main": [
+        [
+          {
+            "node": "Check Issue in Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Issue in Data Table": {
+      "main": [
+        [
+          {
+            "node": "If Not Processed Yet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Not Processed Yet": {
+      "main": [
+        [
+          {
+            "node": "If First-Time Contributor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Classifier Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If First-Time Contributor": {
+      "main": [
+        [
+          {
+            "node": "Add Label First-Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Label First-Time": {
+      "main": [
+        [
+          {
+            "node": "Comment Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Classifier Input": {
+      "main": [
+        [
+          {
+            "node": "Call Classifier Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Classifier Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "If Confident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Confident": {
+      "main": [
+        [
+          {
+            "node": "Switch by Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add Label needs-triage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch by Type": {
+      "main": [
+        [
+          {
+            "node": "Add Label bug",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add Label task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add Label feature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Label bug": {
+      "main": [
+        [
+          {
+            "node": "Comment Bug",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Bug": {
+      "main": [
+        [
+          {
+            "node": "Save Issue to Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Label task": {
+      "main": [
+        [
+          {
+            "node": "Comment Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Task": {
+      "main": [
+        [
+          {
+            "node": "Save Issue to Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Label feature": {
+      "main": [
+        [
+          {
+            "node": "Comment Feature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Feature": {
+      "main": [
+        [
+          {
+            "node": "Save Issue to Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Label needs-triage": {
+      "main": [
+        [
+          {
+            "node": "Save Issue to Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

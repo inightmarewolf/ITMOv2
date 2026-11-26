@@ -1,0 +1,130 @@
+{
+  "name": "Practice 7.2 - Sub-workflow: Issue Classifier",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "11111111-1111-4111-8111-111111111101",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -300,
+        240
+      ],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Classify this GitHub Issue into one of: bug, task, feature, unknown.\n\nRules:\n- bug: something is broken, crashes, throws an error, unexpected behavior.\n- task: question, how-to, documentation request, chore, configuration help.\n- feature: request for new functionality, enhancement, improvement.\n- unknown: vague or ambiguous description without enough details (set confidence < 0.8).\n\nExamples:\n1) Title: \"App crashes on upload > 10MB\" | Body: \"Steps: 1. Upload file 2. Error 500\" -> {\"type\": \"bug\", \"confidence\": 0.95}\n2) Title: \"How to configure dark mode?\" | Body: \"Cannot find it in README\" -> {\"type\": \"task\", \"confidence\": 0.90}\n3) Title: \"Add CSV export button\" | Body: \"Would be great to export reports\" -> {\"type\": \"feature\", \"confidence\": 0.92}\n4) Title: \"Sometimes doesn't work\" | Body: \"Fix please\" -> {\"type\": \"unknown\", \"confidence\": 0.40}\n\nNow classify:\nTitle: {{ $json.title }}\nBody: {{ $json.body }}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111102",
+      "name": "AI Issue Classifier",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        -40,
+        240
+      ],
+      "typeVersion": 1.5
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-5.2",
+          "mode": "list",
+          "cachedResultName": "openai/gpt-5.2"
+        },
+        "options": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111103",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        -120,
+        460
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"type\": {\n      \"type\": \"string\",\n      \"enum\": [\"bug\", \"task\", \"feature\", \"unknown\"]\n    },\n    \"confidence\": {\n      \"type\": \"number\"\n    }\n  },\n  \"required\": [\"type\", \"confidence\"]\n}"
+      },
+      "id": "11111111-1111-4111-8111-111111111104",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        100,
+        460
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst out = raw.output ?? raw;\nreturn [{\n  json: {\n    type: out.type || 'unknown',\n    confidence: typeof out.confidence === 'number' ? out.confidence : Number(out.confidence) || 0\n  }\n}];"
+      },
+      "id": "11111111-1111-4111-8111-111111111105",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        260,
+        240
+      ],
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "AI Issue Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Issue Classifier",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Issue Classifier",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Issue Classifier": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

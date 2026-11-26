@@ -1,0 +1,434 @@
+{
+  "name": "Practice 7.2 - Weekly Issues Stats to Gmail",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * MON"
+            }
+          ]
+        }
+      },
+      "id": "33333333-3333-4333-8333-333333333301",
+      "name": "Weekly Cron (Mon 09:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -900,
+        240
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst sinceDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\nreturn [{\n  json: {\n    repo: 'inightmarewolf/practice_7.1',\n    since: sinceDate.toISOString(),\n    week_start: now.toISOString().slice(0, 10)\n  }\n}];"
+      },
+      "id": "33333333-3333-4333-8333-333333333302",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -680,
+        240
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Config').first().json.repo }}/issues?state=all&since={{ $('Config').first().json.since }}&per_page=100",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "33333333-3333-4333-8333-333333333303",
+      "name": "Get All Issues (7d)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -460,
+        240
+      ],
+      "typeVersion": 4.2,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Config').first().json.repo }}/issues?state=all&labels=bug&since={{ $('Config').first().json.since }}&per_page=100",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "33333333-3333-4333-8333-333333333304",
+      "name": "Get Bug Issues (7d)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -240,
+        240
+      ],
+      "typeVersion": 4.2,
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Config').first().json.repo }}/issues?state=all&labels=task&since={{ $('Config').first().json.since }}&per_page=100",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "33333333-3333-4333-8333-333333333305",
+      "name": "Get Task Issues (7d)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -20,
+        240
+      ],
+      "typeVersion": 4.2,
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Config').first().json.repo }}/issues?state=all&labels=feature&since={{ $('Config').first().json.since }}&per_page=100",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "33333333-3333-4333-8333-333333333306",
+      "name": "Get Feature Issues (7d)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        200,
+        240
+      ],
+      "typeVersion": 4.2,
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst allRaw = $('Get All Issues (7d)').all().map(i => i.json).filter(x => x && x.number && !x.pull_request);\nconst bugsRaw = $('Get Bug Issues (7d)').all().map(i => i.json).filter(x => x && x.number && !x.pull_request);\nconst tasksRaw = $('Get Task Issues (7d)').all().map(i => i.json).filter(x => x && x.number && !x.pull_request);\nconst featRaw = $('Get Feature Issues (7d)').all().map(i => i.json).filter(x => x && x.number && !x.pull_request);\n\nlet closed = 0;\nlet needsTriage = 0;\nconst byAuthor = {};\n\nfor (const issue of allRaw) {\n  if (issue.state === 'closed') closed++;\n  const labels = (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));\n  if (labels.includes('needs-triage')) needsTriage++;\n  const author = issue.user?.login || 'unknown';\n  byAuthor[author] = (byAuthor[author] || 0) + 1;\n}\n\nreturn [{\n  json: {\n    repo: cfg.repo,\n    week_start: cfg.week_start,\n    total: allRaw.length,\n    bugs: bugsRaw.length,\n    tasks: tasksRaw.length,\n    features: featRaw.length,\n    needs_triage: needsTriage,\n    closed,\n    by_author: byAuthor\n  }\n}];"
+      },
+      "id": "33333333-3333-4333-8333-333333333307",
+      "name": "Group Weekly Stats",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        420,
+        240
+      ],
+      "typeVersion": 2,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "returnAll": true
+      },
+      "id": "33333333-3333-4333-8333-333333333308",
+      "name": "Get Previous Week Stats",
+      "type": "n8n-nodes-base.dataTable",
+      "position": [
+        640,
+        240
+      ],
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cur = $('Group Weekly Stats').first().json;\nconst prevRows = $input.all()\n  .map(i => i.json)\n  .filter(r => r && r.week_start && r.week_start !== cur.week_start)\n  .sort((a, b) => String(b.week_start).localeCompare(String(a.week_start)));\n\nconst prev = prevRows[0] || null;\nconst fmtDelta = (val, prevVal) => {\n  if (!prev || prevVal === undefined || prevVal === null) return '—';\n  const d = Number(val) - Number(prevVal);\n  if (d > 0) return '+' + d;\n  return String(d);\n};\n\nconst deltas = {\n  total: fmtDelta(cur.total, prev?.total),\n  bugs: fmtDelta(cur.bugs, prev?.bugs),\n  tasks: fmtDelta(cur.tasks, prev?.tasks),\n  features: fmtDelta(cur.features, prev?.features),\n  needs_triage: fmtDelta(cur.needs_triage, prev?.needs_triage),\n  closed: fmtDelta(cur.closed, prev?.closed)\n};\n\nreturn [{\n  json: {\n    ...cur,\n    prev_week: prev ? prev.week_start : null,\n    deltas\n  }\n}];"
+      },
+      "id": "33333333-3333-4333-8333-333333333309",
+      "name": "Compute Delta",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        860,
+        240
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Напиши краткий аналитический комментарий (3–5 предложений на русском языке) по еженедельной статистике GitHub Issues для репозитория {{ $json.repo }}.\n\nДанные за текущую неделю ({{ $json.week_start }}):\n- Всего Issues: {{ $json.total }} (Δ к прошлой неделе: {{ $json.deltas.total }})\n- Баги (bug): {{ $json.bugs }} (Δ: {{ $json.deltas.bugs }})\n- Задачи/вопросы (task): {{ $json.tasks }} (Δ: {{ $json.deltas.tasks }})\n- Фичи (feature): {{ $json.features }} (Δ: {{ $json.deltas.features }})\n- Требуют ручной сортировки (needs-triage): {{ $json.needs_triage }} (Δ: {{ $json.deltas.needs_triage }})\n- Закрыто: {{ $json.closed }} (Δ: {{ $json.deltas.closed }})\n- По авторам: {{ JSON.stringify($json.by_author) }}\n\nОтметь основные тренды и на что команде обратить внимание.",
+        "options": {}
+      },
+      "id": "33333333-3333-4333-8333-333333333310",
+      "name": "AI Weekly Summary",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1080,
+        240
+      ],
+      "typeVersion": 1.5
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-5.2",
+          "mode": "list",
+          "cachedResultName": "openai/gpt-5.2"
+        },
+        "options": {}
+      },
+      "id": "33333333-3333-4333-8333-333333333311",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1080,
+        440
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Compute Delta').first().json;\nconst aiText = $input.first().json.text || $input.first().json.output || '';\n\nconst authorRows = Object.entries(d.by_author || {})\n  .map(([author, cnt]) => `<tr><td style=\"padding:6px 10px;border:1px solid #ddd;\">${author}</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${cnt}</td></tr>`)\n  .join('');\n\nconst html = `\n<div style=\"font-family:Arial,sans-serif;max-width:640px;color:#222;\">\n  <h2>Еженедельная статистика Issues (${d.repo})</h2>\n  <p>Дата отчёта: <b>${d.week_start}</b>${d.prev_week ? ` (сравнение с ${d.prev_week})` : ''}</p>\n  <h3>По типам</h3>\n  <table style=\"border-collapse:collapse;width:100%;\">\n    <thead>\n      <tr style=\"background:#f4f4f4;\">\n        <th style=\"padding:8px 10px;border:1px solid #ddd;text-align:left;\">Категория</th>\n        <th style=\"padding:8px 10px;border:1px solid #ddd;text-align:left;\">Количество</th>\n        <th style=\"padding:8px 10px;border:1px solid #ddd;text-align:left;\">Δ к прошлой неделе</th>\n      </tr>\n    </thead>\n    <tbody>\n      <tr><td style=\"padding:6px 10px;border:1px solid #ddd;\">Всего Issues</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.total}</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.deltas.total}</td></tr>\n      <tr><td style=\"padding:6px 10px;border:1px solid #ddd;\">bug</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.bugs}</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.deltas.bugs}</td></tr>\n      <tr><td style=\"padding:6px 10px;border:1px solid #ddd;\">task</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.tasks}</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.deltas.tasks}</td></tr>\n      <tr><td style=\"padding:6px 10px;border:1px solid #ddd;\">feature</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.features}</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.deltas.features}</td></tr>\n      <tr><td style=\"padding:6px 10px;border:1px solid #ddd;\">needs-triage</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.needs_triage}</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.deltas.needs_triage}</td></tr>\n      <tr><td style=\"padding:6px 10px;border:1px solid #ddd;\">Закрыто</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.closed}</td><td style=\"padding:6px 10px;border:1px solid #ddd;\">${d.deltas.closed}</td></tr>\n    </tbody>\n  </table>\n  <h3>По авторам</h3>\n  <table style=\"border-collapse:collapse;width:100%;\">\n    <thead>\n      <tr style=\"background:#f4f4f4;\">\n        <th style=\"padding:8px 10px;border:1px solid #ddd;text-align:left;\">Автор</th>\n        <th style=\"padding:8px 10px;border:1px solid #ddd;text-align:left;\">Issues</th>\n      </tr>\n    </thead>\n    <tbody>${authorRows || '<tr><td colspan=\"2\" style=\"padding:6px 10px;border:1px solid #ddd;\">Нет данных</td></tr>'}</tbody>\n  </table>\n  <div style=\"margin-top:16px;padding:12px;background:#f0f7ff;border-left:4px solid #2563eb;\">\n    <b>AI-комментарий недели</b>\n    <p style=\"margin:6px 0 0;\">${aiText.replace(/\\n/g, '<br>')}</p>\n  </div>\n</div>`;\n\nreturn [{\n  json: {\n    subject: `GitHub Issues: статистика за неделю (${d.week_start})`,\n    html,\n    ...d\n  }\n}];"
+      },
+      "id": "33333333-3333-4333-8333-333333333312",
+      "name": "Build Final Email HTML",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1340,
+        240
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "week_start": "={{ $json.week_start }}",
+            "total": "={{ $json.total }}",
+            "bugs": "={{ $json.bugs }}",
+            "tasks": "={{ $json.tasks }}",
+            "features": "={{ $json.features }}",
+            "needs_triage": "={{ $json.needs_triage }}",
+            "closed": "={{ $json.closed }}"
+          }
+        }
+      },
+      "id": "33333333-3333-4333-8333-333333333313",
+      "name": "Save Week Stats",
+      "type": "n8n-nodes-base.dataTable",
+      "position": [
+        1560,
+        240
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "sendTo": "",
+        "subject": "={{ $('Build Final Email HTML').first().json.subject }}",
+        "message": "={{ $('Build Final Email HTML').first().json.html }}",
+        "options": {}
+      },
+      "id": "33333333-3333-4333-8333-333333333314",
+      "name": "Send Gmail Report",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1780,
+        240
+      ],
+      "typeVersion": 2.1
+    }
+  ],
+  "connections": {
+    "Weekly Cron (Mon 09:00)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get All Issues (7d)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Issues (7d)": {
+      "main": [
+        [
+          {
+            "node": "Get Bug Issues (7d)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bug Issues (7d)": {
+      "main": [
+        [
+          {
+            "node": "Get Task Issues (7d)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Task Issues (7d)": {
+      "main": [
+        [
+          {
+            "node": "Get Feature Issues (7d)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Feature Issues (7d)": {
+      "main": [
+        [
+          {
+            "node": "Group Weekly Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group Weekly Stats": {
+      "main": [
+        [
+          {
+            "node": "Get Previous Week Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Previous Week Stats": {
+      "main": [
+        [
+          {
+            "node": "Compute Delta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Delta": {
+      "main": [
+        [
+          {
+            "node": "AI Weekly Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Weekly Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Weekly Summary": {
+      "main": [
+        [
+          {
+            "node": "Build Final Email HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Final Email HTML": {
+      "main": [
+        [
+          {
+            "node": "Save Week Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Week Stats": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

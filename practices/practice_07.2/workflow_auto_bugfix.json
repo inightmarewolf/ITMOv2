@@ -1,0 +1,748 @@
+{
+  "name": "Practice 7.2 - Bonus: Auto Bugfix to Main",
+  "nodes": [
+    {
+      "parameters": {
+        "owner": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "events": [
+          "issues"
+        ],
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444401",
+      "name": "Bug Issue Trigger",
+      "type": "n8n-nodes-base.githubTrigger",
+      "position": [
+        -1320,
+        240
+      ],
+      "webhookId": "7f6e5d4c-3b2a-4109-8765-fedcba987654",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-bug-opened",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "opened",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444402",
+      "name": "Filter Issue Opened",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -1100,
+        240
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.body.repository.full_name }}/git/ref/heads/main",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444403",
+      "name": "Get Main Branch Ref",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -880,
+        240
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/contents/?ref=main",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444421",
+      "name": "List Repo Files",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -660,
+        240
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const issue = $('Filter Issue Opened').first().json.body.issue;\nconst text = ((issue.title || '') + ' ' + (issue.body || '')).toLowerCase();\nconst files = $input.all().map(i => i.json).filter(f => f && f.type === 'file');\nconst codeFiles = files.filter(f => /\\.(py|js|ts|tsx|go|java)$/i.test(f.name));\nconst pool = codeFiles.length ? codeFiles : files.filter(f => !/readme/i.test(f.name));\nconst matched = pool.find(f => text.includes(f.name.toLowerCase())) || pool[0] || files[0];\n\nif (!matched) {\n  throw new Error('No files found in repository main branch');\n}\n\nreturn [{\n  json: {\n    target_path: matched.path,\n    all_files: files.map(f => f.path)\n  }\n}];"
+      },
+      "id": "44444444-4444-4444-8444-444444444422",
+      "name": "Pick Target File",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -440,
+        240
+      ],
+      "typeVersion": 2,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Filter Issue Opened').first().json.body.repository.full_name }}/contents/{{ $json.target_path }}?ref=main",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444404",
+      "name": "Get Target File from Main",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -220,
+        240
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const issue = $('Filter Issue Opened').first().json.body.issue;\nconst repo = $('Filter Issue Opened').first().json.body.repository.full_name;\nconst mainSha = $('Get Main Branch Ref').first().json.object.sha;\nconst fileData = $input.first().json;\nconst decodedCode = Buffer.from((fileData.content || '').replace(/\\n/g, ''), 'base64').toString('utf8');\nconst branchName = `fix/issue-${issue.number}-${Date.now().toString().slice(-4)}`;\n\nreturn [{\n  json: {\n    repo,\n    issue_number: issue.number,\n    issue_title: issue.title || '',\n    issue_body: issue.body || '',\n    main_sha: mainSha,\n    file_path: fileData.path,\n    file_sha: fileData.sha,\n    current_code: decodedCode,\n    branch_name: branchName\n  }\n}];"
+      },
+      "id": "44444444-4444-4444-8444-444444444405",
+      "name": "Decode Source Code",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        0,
+        240
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Ты опытный Python-разработчик. На основе bug report-а исправь ошибку в файле `{{ $json.file_path }}`.\n\nBug report (#{{ $json.issue_number }}):\nЗаголовок: {{ $json.issue_title }}\nОписание: {{ $json.issue_body }}\n\nТекущий код файла `{{ $json.file_path }}`:\n```python\n{{ $json.current_code }}\n```\n\nВерни полный исправленный код файла в поле `fixed_code`, краткое сообщение коммита в `commit_message` и заголовок PR в `pr_title`.",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444406",
+      "name": "AI Bug Fixer",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        240,
+        240
+      ],
+      "typeVersion": 1.5
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-5.2",
+          "mode": "list",
+          "cachedResultName": "openai/gpt-5.2"
+        },
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444407",
+      "name": "OpenAI Fixer Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        160,
+        460
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"fixed_code\": { \"type\": \"string\" },\n    \"commit_message\": { \"type\": \"string\" },\n    \"pr_title\": { \"type\": \"string\" }\n  },\n  \"required\": [\"fixed_code\", \"commit_message\", \"pr_title\"]\n}"
+      },
+      "id": "44444444-4444-4444-8444-444444444408",
+      "name": "Fixer Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        380,
+        460
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Decode Source Code').first().json;\nconst out = $input.first().json.output ?? $input.first().json;\nconst encoded = Buffer.from(out.fixed_code, 'utf8').toString('base64');\n\nreturn [{\n  json: {\n    ...ctx,\n    fixed_code: out.fixed_code,\n    fixed_code_base64: encoded,\n    commit_message: out.commit_message || `fix: resolve issue #${ctx.issue_number}`,\n    pr_title: out.pr_title || `Fix #${ctx.issue_number}: ${ctx.issue_title}`\n  }\n}];"
+      },
+      "id": "44444444-4444-4444-8444-444444444409",
+      "name": "Encode Fixed Code",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        520,
+        240
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $json.repo }}/git/refs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ref: 'refs/heads/' + $json.branch_name, sha: $json.main_sha }) }}",
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444410",
+      "name": "Create Fix Branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        740,
+        240
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.github.com/repos/{{ $('Encode Fixed Code').first().json.repo }}/contents/{{ $('Encode Fixed Code').first().json.file_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: $('Encode Fixed Code').first().json.commit_message, content: $('Encode Fixed Code').first().json.fixed_code_base64, sha: $('Encode Fixed Code').first().json.file_sha, branch: $('Encode Fixed Code').first().json.branch_name }) }}",
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444411",
+      "name": "Commit Fix to Branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        960,
+        240
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Encode Fixed Code').first().json.repo }}/pulls",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $('Encode Fixed Code').first().json.pr_title, head: $('Encode Fixed Code').first().json.branch_name, base: 'main', body: 'Автоматическое исправление для Issue #' + $('Encode Fixed Code').first().json.issue_number + '\\n\\nCloses #' + $('Encode Fixed Code').first().json.issue_number }) }}",
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444412",
+      "name": "Create Pull Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1180,
+        240
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Encode Fixed Code').first().json.repo }}/pulls/{{ $json.number }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3.diff"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444413",
+      "name": "Get PR Diff for Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1400,
+        240
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Ты senior code reviewer. Проведи ревью этого PR, созданного для исправления Issue #{{ $('Encode Fixed Code').first().json.issue_number }} ({{ $('Encode Fixed Code').first().json.issue_title }}).\n\nDiff:\n```diff\n{{ $json.data }}\n```\n\nЕсли критических багов, уязвимостей и регрессий нет — поставь `approved: true`. Если есть серьёзные замечания — поставь `approved: false`. Выбор между ValueError/ZeroDivisionError и мелкие стилевые замечания не считай критическими. В `review_comment` напиши краткий итог ревью на русском языке.",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444414",
+      "name": "AI Code Reviewer",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1620,
+        240
+      ],
+      "typeVersion": 1.5
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "anthropic/claude-sonnet-4.5",
+          "mode": "list",
+          "cachedResultName": "anthropic/claude-sonnet-4.5"
+        },
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444415",
+      "name": "OpenAI Reviewer Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1560,
+        460
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"approved\": { \"type\": \"boolean\" },\n    \"review_comment\": { \"type\": \"string\" }\n  },\n  \"required\": [\"approved\", \"review_comment\"]\n}"
+      },
+      "id": "44444444-4444-4444-8444-444444444416",
+      "name": "Reviewer Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        1760,
+        460
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Encode Fixed Code').first().json.repo }}/pulls/{{ $('Create Pull Request').first().json.number }}/reviews",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event: 'COMMENT', body: '**[Auto Review]**\\n\\nApproved: ' + (($json.output ?? $json).approved ? 'YES' : 'NO') + '\\n\\n' + ($json.output ?? $json).review_comment }) }}",
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444417",
+      "name": "Post PR Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1900,
+        240
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-approved",
+              "leftValue": "={{ ($('AI Code Reviewer').first().json.output ?? $('AI Code Reviewer').first().json).approved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444418",
+      "name": "If Approved",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2120,
+        240
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.github.com/repos/{{ $('Encode Fixed Code').first().json.repo }}/pulls/{{ $('Create Pull Request').first().json.number }}/merge",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ merge_method: 'squash', commit_title: $('Encode Fixed Code').first().json.pr_title }) }}",
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444419",
+      "name": "Merge PR into Main",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2360,
+        160
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Encode Fixed Code').first().json.repo }}/issues/{{ $('Encode Fixed Code').first().json.issue_number }}/comments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: 'Исправление автоматически сформировано в ветке `' + $('Encode Fixed Code').first().json.branch_name + '`, прошло AI-ревью и смержено в `main` (PR #' + $('Create Pull Request').first().json.number + ').' }) }}",
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444420",
+      "name": "Notify Issue Merged",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2580,
+        160
+      ],
+      "typeVersion": 4.2
+    }
+  ],
+  "connections": {
+    "Bug Issue Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter Issue Opened",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Issue Opened": {
+      "main": [
+        [
+          {
+            "node": "Get Main Branch Ref",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Main Branch Ref": {
+      "main": [
+        [
+          {
+            "node": "List Repo Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Repo Files": {
+      "main": [
+        [
+          {
+            "node": "Pick Target File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Target File": {
+      "main": [
+        [
+          {
+            "node": "Get Target File from Main",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Target File from Main": {
+      "main": [
+        [
+          {
+            "node": "Decode Source Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode Source Code": {
+      "main": [
+        [
+          {
+            "node": "AI Bug Fixer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Fixer Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Bug Fixer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fixer Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Bug Fixer",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Bug Fixer": {
+      "main": [
+        [
+          {
+            "node": "Encode Fixed Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encode Fixed Code": {
+      "main": [
+        [
+          {
+            "node": "Create Fix Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Fix Branch": {
+      "main": [
+        [
+          {
+            "node": "Commit Fix to Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Commit Fix to Branch": {
+      "main": [
+        [
+          {
+            "node": "Create Pull Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Pull Request": {
+      "main": [
+        [
+          {
+            "node": "Get PR Diff for Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PR Diff for Review": {
+      "main": [
+        [
+          {
+            "node": "AI Code Reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Reviewer Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Code Reviewer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reviewer Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Code Reviewer",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Code Reviewer": {
+      "main": [
+        [
+          {
+            "node": "Post PR Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post PR Review": {
+      "main": [
+        [
+          {
+            "node": "If Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Approved": {
+      "main": [
+        [
+          {
+            "node": "Merge PR into Main",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge PR into Main": {
+      "main": [
+        [
+          {
+            "node": "Notify Issue Merged",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
