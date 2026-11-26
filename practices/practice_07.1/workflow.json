@@ -1,0 +1,888 @@
+{
+  "name": "Practice 7.1 - AI Code Review Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "owner": {
+          "__rl": true,
+          "value": "ai-course-avito",
+          "mode": "list",
+          "cachedResultName": "ai-course-avito",
+          "cachedResultUrl": "https://github.com/ai-course-avito"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "sample-python-project",
+          "mode": "list",
+          "cachedResultName": "sample-python-project",
+          "cachedResultUrl": "https://github.com/ai-course-avito/sample-python-project"
+        },
+        "events": [
+          "pull_request"
+        ],
+        "options": {}
+      },
+      "id": "a391fc09-8389-4fb7-a502-305d0d4faaa9",
+      "name": "PR Trigger",
+      "type": "n8n-nodes-base.githubTrigger",
+      "position": [
+        -600,
+        160
+      ],
+      "webhookId": "c6a30e53-bda5-4922-87f3-8cdfb399a35f",
+      "typeVersion": 1,
+      "credentials": {
+        "githubApi": {
+          "id": "m4bH8KpPvEKECwJK",
+          "name": "My GitHub"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "owner": {
+          "__rl": true,
+          "value": "ai-course-avito",
+          "mode": "list",
+          "cachedResultName": "ai-course-avito",
+          "cachedResultUrl": "https://github.com/ai-course-avito"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "sample-python-project",
+          "mode": "list",
+          "cachedResultName": "sample-python-project",
+          "cachedResultUrl": "https://github.com/ai-course-avito/sample-python-project"
+        },
+        "events": [
+          "issue_comment"
+        ],
+        "options": {}
+      },
+      "id": "b12e4a77-190a-4f10-91a1-5c93f4b21101",
+      "name": "PR Comment Trigger",
+      "type": "n8n-nodes-base.githubTrigger",
+      "position": [
+        -600,
+        420
+      ],
+      "webhookId": "d7b41f64-cea6-4033-98e4-9defc4a0b460",
+      "typeVersion": 1,
+      "credentials": {
+        "githubApi": {
+          "id": "m4bH8KpPvEKECwJK",
+          "name": "My GitHub"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-pr-opened",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "opened",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c23f5b88-2a1b-4b21-82b2-6da405c32202",
+      "name": "Filter PR Opened",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -380,
+        160
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-comment-created",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "created",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-is-pr",
+              "leftValue": "={{ Boolean($json.body.issue?.pull_request) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "cond-is-command",
+              "leftValue": "={{ ['/make_ai_review', '/make_other_ai_review'].includes(($json.body.comment?.body || '').trim()) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d3406c99-3b2c-4c32-93c3-7eb516d43303",
+      "name": "Filter PR Comment",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -380,
+        420
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\n\nif (body.pull_request) {\n  return [{\n    json: {\n      repo: body.pull_request.base.repo.full_name,\n      pr_number: body.number,\n      command: 'opened',\n      model_route: 'primary'\n    }\n  }];\n}\n\nconst commentBody = (body.comment?.body || '').trim();\nreturn [{\n  json: {\n    repo: body.repository.full_name,\n    pr_number: body.issue.number,\n    command: commentBody,\n    model_route: commentBody === '/make_other_ai_review' ? 'other' : 'primary'\n  }\n}];"
+      },
+      "id": "e4517d00-4c3d-4d43-a4d4-8fc627e54404",
+      "name": "Normalize Event",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -140,
+        280
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.repo }}/pulls/{{ $json.pr_number }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f5628e11-5d4e-4e54-b5e5-90d738f65505",
+      "name": "Get PR Metadata",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        80,
+        280
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "l3rvJZQBJ98IxcSb",
+          "name": "Bearer Auth account 141"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Normalize Event').first().json.model_route }}",
+                    "rightValue": "primary",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "primary"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Normalize Event').first().json.model_route }}",
+                    "rightValue": "other",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "other"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a6739f22-6e5f-4f65-86f6-a1e849076606",
+      "name": "Route by Command",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        300,
+        280
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "pr_id",
+              "keyValue": "={{ String($json.id) }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "b7840a33-7f60-4076-9707-b2f950187707",
+      "name": "Check PR in Data Table",
+      "type": "n8n-nodes-base.dataTable",
+      "position": [
+        520,
+        160
+      ],
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-not-reviewed",
+              "leftValue": "={{ $json.pr_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c8951b44-8071-4187-a818-c30a61298808",
+      "name": "If Not Reviewed Yet",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        740,
+        160
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Get PR Metadata').first().json.base.repo.full_name }}/pulls/{{ $('Get PR Metadata').first().json.number }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3.diff"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ebc36ad8-47f7-4b0a-a88e-9ab901f4f14c",
+      "name": "Get PR Diff (Primary)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        960,
+        160
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "l3rvJZQBJ98IxcSb",
+          "name": "Bearer Auth account 141"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.data || '';\nconst results = [];\nconst fileBlocks = raw.split(/^diff --git /m).slice(1);\n\nfor (const fileBlock of fileBlocks) {\n  const lines = fileBlock.split(/\\r?\\n/);\n  let oldPath = null;\n  let newPath = null;\n  for (const l of lines) {\n    if (l.startsWith('--- ')) oldPath = l.slice(4).replace(/^a\\//, '').trim();\n    else if (l.startsWith('+++ ')) newPath = l.slice(4).replace(/^b\\//, '').trim();\n    else if (l.startsWith('@@ ')) break;\n  }\n  if (!newPath && !oldPath) continue;\n  const filePath = newPath && newPath !== '/dev/null' ? newPath : oldPath;\n\n  const hunkMatches = [...fileBlock.matchAll(/^@@ -(\\d+)(?:,(\\d+))? \\+(\\d+)(?:,(\\d+))? @@.*$/gm)];\n  for (let i = 0; i < hunkMatches.length; i++) {\n    const m = hunkMatches[i];\n    const startIdx = m.index;\n    const endIdx = i + 1 < hunkMatches.length ? hunkMatches[i + 1].index : fileBlock.length;\n    const hunkText = fileBlock.slice(startIdx, endIdx).trimEnd();\n    const hunkLines = hunkText.split(/\\r?\\n/).slice(1);\n\n    let oldLine = parseInt(m[1], 10);\n    let newLine = parseInt(m[3], 10);\n    let lastAddedNew = null;\n    let lastContextNew = null;\n    let lastDeletedOld = null;\n\n    for (const hl of hunkLines) {\n      if (hl.startsWith('\\\\ No newline')) continue;\n      if (hl.startsWith('+')) {\n        lastAddedNew = newLine;\n        newLine++;\n      } else if (hl.startsWith('-')) {\n        lastDeletedOld = oldLine;\n        oldLine++;\n      } else {\n        lastContextNew = newLine;\n        oldLine++;\n        newLine++;\n      }\n    }\n\n    let side = 'RIGHT';\n    let targetLine = lastAddedNew ?? lastContextNew;\n    if (targetLine === null || targetLine === undefined) {\n      side = 'LEFT';\n      targetLine = lastDeletedOld ?? 1;\n    }\n\n    results.push({\n      json: {\n        path: filePath,\n        line: targetLine,\n        side,\n        hunk: hunkText\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "id": "d9062c55-9182-4298-b929-d41b72309909",
+      "name": "Parse Diff to Hunks (Primary)",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1180,
+        160
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a senior developer.\n\nСделай code review ТОЛЬКО этого блока изменённого кода (hunk) в файле `{{ $json.path }}`.\nНайди:\n• баги\n• проблемы безопасности\n• регрессии\n• проблемы производительности\n• нарушения best practices\n\nЕсли замечаний нет — кратко напиши, что блок выглядит корректно. Если есть замечания — дай конкретные рекомендации и примеры исправлений.\n\n```diff\n{{ $json.hunk }}\n```",
+        "options": {
+          "systemMessage": ""
+        }
+      },
+      "id": "6cc6599d-1386-4756-8e1c-2bd04e5fc513",
+      "name": "Code Review Agent (Primary)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1400,
+        160
+      ],
+      "typeVersion": 1.9
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-5.2",
+          "mode": "list",
+          "cachedResultName": "openai/gpt-5.2"
+        },
+        "options": {}
+      },
+      "id": "1adbf7bc-64ca-411f-b618-dea5ee7c9158",
+      "name": "OpenAI Chat Model (Primary)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1400,
+        340
+      ],
+      "typeVersion": 1.2,
+      "credentials": {
+        "openAiApi": {
+          "id": "HRWW8dHI5ZqcvHv9",
+          "name": "OpenAi vsellm.ru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Get PR Metadata').first().json.base.repo.full_name }}/pulls/{{ $('Get PR Metadata').first().json.number }}/comments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: '**[AI Review — Primary: openai/gpt-5.2]**\\n\\n' + $json.output, commit_id: $('Get PR Metadata').first().json.head.sha, path: $('Parse Diff to Hunks (Primary)').item.json.path, line: $('Parse Diff to Hunks (Primary)').item.json.line, side: $('Parse Diff to Hunks (Primary)').item.json.side }) }}",
+        "options": {}
+      },
+      "id": "e0173d66-a293-43a9-803a-e52c8341aa10",
+      "name": "Post Inline Comment (Primary)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1660,
+        160
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "l3rvJZQBJ98IxcSb",
+          "name": "Bearer Auth account 141"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "maxItems": 1
+      },
+      "id": "f1284e77-b3a4-44ba-914b-f63d9452bb11",
+      "name": "Once per PR",
+      "type": "n8n-nodes-base.limit",
+      "position": [
+        1880,
+        160
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "pr_id": "={{ String($('Get PR Metadata').first().json.id) }}"
+          }
+        }
+      },
+      "id": "a2395f88-c4b5-45cb-a25c-074e0563cc12",
+      "name": "Save PR to Data Table",
+      "type": "n8n-nodes-base.dataTable",
+      "position": [
+        2100,
+        160
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": {
+          "__rl": true,
+          "value": "ai-course-avito",
+          "mode": "list",
+          "cachedResultName": "ai-course-avito",
+          "cachedResultUrl": "https://github.com/ai-course-avito"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "sample-python-project",
+          "mode": "list",
+          "cachedResultName": "sample-python-project",
+          "cachedResultUrl": "https://github.com/ai-course-avito/sample-python-project"
+        },
+        "issueNumber": "={{ $('Get PR Metadata').first().json.number }}",
+        "editFields": {
+          "labels": [
+            {
+              "label": "ReviewedByAI"
+            }
+          ]
+        }
+      },
+      "id": "23f9aaab-2035-4081-9db8-d1b3fa7b1b99",
+      "name": "Add Label ReviewedByAI",
+      "type": "n8n-nodes-base.github",
+      "position": [
+        2320,
+        160
+      ],
+      "webhookId": "70d2db56-965b-4f1f-817c-1fbb311320c0",
+      "typeVersion": 1,
+      "credentials": {
+        "githubApi": {
+          "id": "m4bH8KpPvEKECwJK",
+          "name": "My GitHub"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Get PR Metadata').first().json.base.repo.full_name }}/pulls/{{ $('Get PR Metadata').first().json.number }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3.diff"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b3406099-d5c6-46dc-b36d-185f1674dd13",
+      "name": "Get PR Diff (Other)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        960,
+        520
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "l3rvJZQBJ98IxcSb",
+          "name": "Bearer Auth account 141"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.data || '';\nconst results = [];\nconst fileBlocks = raw.split(/^diff --git /m).slice(1);\n\nfor (const fileBlock of fileBlocks) {\n  const lines = fileBlock.split(/\\r?\\n/);\n  let oldPath = null;\n  let newPath = null;\n  for (const l of lines) {\n    if (l.startsWith('--- ')) oldPath = l.slice(4).replace(/^a\\//, '').trim();\n    else if (l.startsWith('+++ ')) newPath = l.slice(4).replace(/^b\\//, '').trim();\n    else if (l.startsWith('@@ ')) break;\n  }\n  if (!newPath && !oldPath) continue;\n  const filePath = newPath && newPath !== '/dev/null' ? newPath : oldPath;\n\n  const hunkMatches = [...fileBlock.matchAll(/^@@ -(\\d+)(?:,(\\d+))? \\+(\\d+)(?:,(\\d+))? @@.*$/gm)];\n  for (let i = 0; i < hunkMatches.length; i++) {\n    const m = hunkMatches[i];\n    const startIdx = m.index;\n    const endIdx = i + 1 < hunkMatches.length ? hunkMatches[i + 1].index : fileBlock.length;\n    const hunkText = fileBlock.slice(startIdx, endIdx).trimEnd();\n    const hunkLines = hunkText.split(/\\r?\\n/).slice(1);\n\n    let oldLine = parseInt(m[1], 10);\n    let newLine = parseInt(m[3], 10);\n    let lastAddedNew = null;\n    let lastContextNew = null;\n    let lastDeletedOld = null;\n\n    for (const hl of hunkLines) {\n      if (hl.startsWith('\\\\ No newline')) continue;\n      if (hl.startsWith('+')) {\n        lastAddedNew = newLine;\n        newLine++;\n      } else if (hl.startsWith('-')) {\n        lastDeletedOld = oldLine;\n        oldLine++;\n      } else {\n        lastContextNew = newLine;\n        oldLine++;\n        newLine++;\n      }\n    }\n\n    let side = 'RIGHT';\n    let targetLine = lastAddedNew ?? lastContextNew;\n    if (targetLine === null || targetLine === undefined) {\n      side = 'LEFT';\n      targetLine = lastDeletedOld ?? 1;\n    }\n\n    results.push({\n      json: {\n        path: filePath,\n        line: targetLine,\n        side,\n        hunk: hunkText\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "id": "c45171aa-e6d7-47ed-847e-29602785ee14",
+      "name": "Parse Diff to Hunks (Other)",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1180,
+        520
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a senior developer.\n\nСделай code review ТОЛЬКО этого блока изменённого кода (hunk) в файле `{{ $json.path }}`.\nНайди:\n• баги\n• проблемы безопасности\n• регрессии\n• проблемы производительности\n• нарушения best practices\n\nЕсли замечаний нет — кратко напиши, что блок выглядит корректно. Если есть замечания — дай конкретные рекомендации и примеры исправлений.\n\n```diff\n{{ $json.hunk }}\n```",
+        "options": {
+          "systemMessage": ""
+        }
+      },
+      "id": "d56282bb-f7e8-48fe-958f-3a713896ff15",
+      "name": "Code Review Agent (Other)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1400,
+        520
+      ],
+      "typeVersion": 1.9
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "deepseek/deepseek-chat",
+          "mode": "list",
+          "cachedResultName": "deepseek/deepseek-chat"
+        },
+        "options": {}
+      },
+      "id": "e67393cc-08f9-490f-a690-4b8249070016",
+      "name": "OpenAI Chat Model (Other)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1400,
+        700
+      ],
+      "typeVersion": 1.2,
+      "credentials": {
+        "openAiApi": {
+          "id": "HRWW8dHI5ZqcvHv9",
+          "name": "OpenAi vsellm.ru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Get PR Metadata').first().json.base.repo.full_name }}/pulls/{{ $('Get PR Metadata').first().json.number }}/comments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: '**[AI Review — Other Model: deepseek/deepseek-chat]**\\n\\n' + $json.output, commit_id: $('Get PR Metadata').first().json.head.sha, path: $('Parse Diff to Hunks (Other)').item.json.path, line: $('Parse Diff to Hunks (Other)').item.json.line, side: $('Parse Diff to Hunks (Other)').item.json.side }) }}",
+        "options": {}
+      },
+      "id": "f78404dd-190a-4a10-b7a1-5c9350181117",
+      "name": "Post Inline Comment (Other)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1660,
+        520
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "l3rvJZQBJ98IxcSb",
+          "name": "Bearer Auth account 141"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "PR Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter PR Opened",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PR Comment Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter PR Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter PR Opened": {
+      "main": [
+        [
+          {
+            "node": "Normalize Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter PR Comment": {
+      "main": [
+        [
+          {
+            "node": "Normalize Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Event": {
+      "main": [
+        [
+          {
+            "node": "Get PR Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PR Metadata": {
+      "main": [
+        [
+          {
+            "node": "Route by Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Command": {
+      "main": [
+        [
+          {
+            "node": "Check PR in Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get PR Diff (Other)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check PR in Data Table": {
+      "main": [
+        [
+          {
+            "node": "If Not Reviewed Yet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Not Reviewed Yet": {
+      "main": [
+        [
+          {
+            "node": "Get PR Diff (Primary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PR Diff (Primary)": {
+      "main": [
+        [
+          {
+            "node": "Parse Diff to Hunks (Primary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Diff to Hunks (Primary)": {
+      "main": [
+        [
+          {
+            "node": "Code Review Agent (Primary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model (Primary)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Code Review Agent (Primary)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Review Agent (Primary)": {
+      "main": [
+        [
+          {
+            "node": "Post Inline Comment (Primary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Inline Comment (Primary)": {
+      "main": [
+        [
+          {
+            "node": "Once per PR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Once per PR": {
+      "main": [
+        [
+          {
+            "node": "Save PR to Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save PR to Data Table": {
+      "main": [
+        [
+          {
+            "node": "Add Label ReviewedByAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PR Diff (Other)": {
+      "main": [
+        [
+          {
+            "node": "Parse Diff to Hunks (Other)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Diff to Hunks (Other)": {
+      "main": [
+        [
+          {
+            "node": "Code Review Agent (Other)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model (Other)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Code Review Agent (Other)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Review Agent (Other)": {
+      "main": [
+        [
+          {
+            "node": "Post Inline Comment (Other)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
