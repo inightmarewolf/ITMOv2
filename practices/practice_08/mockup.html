@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Макет Mini Shop — Практика 8</title>
+    <style>
+      :root {
+        --bg: #f4f6f9;
+        --card: #ffffff;
+        --primary: #1565c0;
+        --primary-hover: #0d47a1;
+        --text: #1e293b;
+        --muted: #64748b;
+        --border: #cbd5e1;
+        --success-bg: #e8f5e9;
+        --success-text: #1b5e20;
+        --error-bg: #ffebee;
+        --error-text: #b71c1c;
+        --radius: 12px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      h1 { font-size: 1.5rem; margin: 0 0 8px; }
+      .subtitle { color: var(--muted); margin-bottom: 24px; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+        gap: 20px;
+      }
+      .screen {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+      }
+      .badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #e0f2fe;
+        color: #0369a1;
+        margin-bottom: 12px;
+      }
+      .field { margin-bottom: 12px; }
+      .field label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .input {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        background: #fff;
+      }
+      .input.focus {
+        outline: 3px solid #93c5fd;
+        border-color: var(--primary);
+      }
+      .input.invalid { border-color: #d32f2f; }
+      .helper-err { color: #d32f2f; font-size: 0.78rem; margin-top: 4px; }
+      .btn {
+        width: 100%;
+        padding: 10px 14px;
+        border: none;
+        border-radius: 8px;
+        background: var(--primary);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn.disabled { opacity: 0.55; cursor: not-allowed; }
+      .alert {
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        margin-bottom: 12px;
+      }
+      .alert.success { background: var(--success-bg); color: var(--success-text); }
+      .alert.error { background: var(--error-bg); color: var(--error-text); }
+      .order-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-top: 8px;
+        font-size: 0.88rem;
+      }
+      .empty {
+        text-align: center;
+        color: var(--muted);
+        padding: 16px;
+        border: 1px dashed var(--border);
+        border-radius: 8px;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Макет интерфейса Mini Shop (Практика 8)</h1>
+    <p class="subtitle">
+      Основной сценарий: Покупатель входит в систему → выбирает товар из каталога → оформляет заказ → видит новый заказ в списке.
+    </p>
+
+    <div class="grid">
+      <div class="screen">
+        <span class="badge">1. Исходный экран (Вход)</span>
+        <div class="field">
+          <label>Имя пользователя</label>
+          <input class="input" value="alice" readonly />
+        </div>
+        <div class="field">
+          <label>Пароль</label>
+          <input class="input" type="password" value="••••••••" readonly />
+        </div>
+        <button class="btn">Войти в магазин</button>
+      </div>
+
+      <div class="screen">
+        <span class="badge">2. Ввод данных + пустой список</span>
+        <div class="field">
+          <label>Товар из каталога</label>
+          <select class="input focus" disabled>
+            <option>chair — 5000 ₽</option>
+          </select>
+        </div>
+        <button class="btn">Оформить заказ</button>
+        <div class="empty" style="margin-top: 12px;">Заказов пока нет</div>
+      </div>
+
+      <div class="screen">
+        <span class="badge">3. Загрузка (защита от двойного клика)</span>
+        <div class="field">
+          <label>Товар из каталога</label>
+          <input class="input" value="lamp — 1500 ₽" readonly />
+        </div>
+        <button class="btn disabled">Отправка заказа…</button>
+      </div>
+
+      <div class="screen">
+        <span class="badge">4. Успешный результат</span>
+        <div class="alert success">Заказ #3 (lamp) успешно создан!</div>
+        <div class="order-item">
+          <span><b>#3</b> lamp</span>
+          <span>1500 ₽</span>
+        </div>
+        <div class="order-item">
+          <span><b>#1</b> chair</span>
+          <span>5000 ₽</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <span class="badge">5. Ошибка и валидация</span>
+        <div class="alert error">Ошибка сервера: не удалось создать заказ. Повторите попытку.</div>
+        <div class="field">
+          <label>Имя пользователя</label>
+          <input class="input invalid" value="" readonly />
+          <div class="helper-err">Введите имя пользователя</div>
+        </div>
+        <button class="btn">Повторить попытку</button>
+      </div>
+    </div>
+  </body>
+</html>
